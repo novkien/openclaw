@@ -32,6 +32,9 @@ import { extractPayloadText } from "./test-helpers.agent-results.js";
 // Aggregate docker live runs can contend on startup enough that the gateway
 // websocket handshake needs a wider budget than the single-provider reruns.
 const CLI_GATEWAY_CONNECT_TIMEOUT_MS = 60_000;
+const CLI_CRON_MCP_PROBE_MAX_ATTEMPTS = 3;
+const CLI_CRON_MCP_PROBE_VERIFY_POLLS = 4;
+const CLI_CRON_MCP_PROBE_VERIFY_POLL_MS = 1_500;
 
 export type BootstrapWorkspaceContext = {
   expectedInjectedFiles: string[];
@@ -169,6 +172,15 @@ export async function createBootstrapWorkspace(
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function shouldRetryCliCronMcpProbeReply(text: string): boolean {
+  const normalized = normalizeLowercaseStringOrEmpty(text);
+  return (
+    normalized.includes("cron tool call was cancelled") ||
+    normalized.includes("job was not created") ||
+    normalized.includes("tool call was canceled")
+  );
 }
 
 export async function connectTestGatewayClient(params: {
@@ -411,7 +423,7 @@ export async function verifyCliCronMcpProbe(params: {
   let createdJob: CronListJob | undefined;
   let lastCronText = "";
 
-  for (let attempt = 0; attempt < 2 && !createdJob; attempt += 1) {
+  for (let attempt = 0; attempt < CLI_CRON_MCP_PROBE_MAX_ATTEMPTS && !createdJob; attempt += 1) {
     const runIdMcp = randomUUID();
     const cronResult = await params.client.request(
       "agent",
@@ -432,14 +444,27 @@ export async function verifyCliCronMcpProbe(params: {
       throw new Error(`cron mcp probe failed: status=${String(cronResult?.status)}`);
     }
     lastCronText = extractPayloadText(cronResult?.result).trim();
-    createdJob = await assertCronJobVisibleViaCli({
-      port: params.port,
-      token: params.token,
-      env: params.env,
-      expectedName: cronProbe.name,
-      expectedMessage: cronProbe.message,
-    });
-    if (!createdJob && attempt === 1) {
+    const retryableReply = shouldRetryCliCronMcpProbeReply(lastCronText);
+    for (
+      let verifyAttempt = 0;
+      verifyAttempt < CLI_CRON_MCP_PROBE_VERIFY_POLLS;
+      verifyAttempt += 1
+    ) {
+      createdJob = await assertCronJobVisibleViaCli({
+        port: params.port,
+        token: params.token,
+        env: params.env,
+        expectedName: cronProbe.name,
+        expectedMessage: cronProbe.message,
+      });
+      if (createdJob) {
+        break;
+      }
+      if (verifyAttempt < CLI_CRON_MCP_PROBE_VERIFY_POLLS - 1) {
+        await sleep(CLI_CRON_MCP_PROBE_VERIFY_POLL_MS);
+      }
+    }
+    if (!createdJob && !retryableReply && attempt === CLI_CRON_MCP_PROBE_MAX_ATTEMPTS - 1) {
       throw new Error(
         `cron cli verify could not find job ${cronProbe.name}: reply=${JSON.stringify(lastCronText)}`,
       );

@@ -38,6 +38,7 @@ type EnvSnapshot = {
   configPath?: string;
   gatewayToken?: string;
   openaiApiKey?: string;
+  openaiBaseUrl?: string;
   skipBrowserControl?: string;
   skipCanvas?: string;
   skipChannels?: string;
@@ -60,6 +61,7 @@ function snapshotEnv(): EnvSnapshot {
     configPath: process.env.OPENCLAW_CONFIG_PATH,
     gatewayToken: process.env.OPENCLAW_GATEWAY_TOKEN,
     openaiApiKey: process.env.OPENAI_API_KEY,
+    openaiBaseUrl: process.env.OPENAI_BASE_URL,
     skipBrowserControl: process.env.OPENCLAW_SKIP_BROWSER_CONTROL_SERVER,
     skipCanvas: process.env.OPENCLAW_SKIP_CANVAS_HOST,
     skipChannels: process.env.OPENCLAW_SKIP_CHANNELS,
@@ -74,6 +76,7 @@ function restoreEnv(snapshot: EnvSnapshot): void {
   restoreEnvVar("OPENCLAW_CONFIG_PATH", snapshot.configPath);
   restoreEnvVar("OPENCLAW_GATEWAY_TOKEN", snapshot.gatewayToken);
   restoreEnvVar("OPENAI_API_KEY", snapshot.openaiApiKey);
+  restoreEnvVar("OPENAI_BASE_URL", snapshot.openaiBaseUrl);
   restoreEnvVar("OPENCLAW_SKIP_BROWSER_CONTROL_SERVER", snapshot.skipBrowserControl);
   restoreEnvVar("OPENCLAW_SKIP_CANVAS_HOST", snapshot.skipCanvas);
   restoreEnvVar("OPENCLAW_SKIP_CHANNELS", snapshot.skipChannels);
@@ -411,10 +414,6 @@ describeLive("gateway live (Codex harness)", () => {
     "runs gateway agent turns through the plugin-owned Codex app-server harness",
     async () => {
       const modelKey = process.env.OPENCLAW_LIVE_CODEX_HARNESS_MODEL ?? DEFAULT_CODEX_MODEL;
-      const openaiKey = process.env.OPENAI_API_KEY?.trim();
-      if (!openaiKey) {
-        throw new Error("OPENAI_API_KEY is required for the Codex harness live test.");
-      }
       const { clearRuntimeConfigSnapshot } = await import("../config/config.js");
       const { startGatewayServer } = await import("./server.js");
 
@@ -429,6 +428,11 @@ describeLive("gateway live (Codex harness)", () => {
       clearRuntimeConfigSnapshot();
       process.env.OPENCLAW_AGENT_RUNTIME = "codex";
       process.env.OPENCLAW_AGENT_HARNESS_FALLBACK = "none";
+      // This lane is meant to validate the plugin-owned Codex app-server
+      // against the staged `~/.codex` auth files, not a generic OpenAI API-key
+      // transport that can bypass the harness entirely.
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.OPENAI_BASE_URL;
       process.env.OPENCLAW_CONFIG_PATH = configPath;
       process.env.OPENCLAW_GATEWAY_TOKEN = token;
       process.env.OPENCLAW_SKIP_BROWSER_CONTROL_SERVER = "1";

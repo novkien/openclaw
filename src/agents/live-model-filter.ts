@@ -25,6 +25,7 @@ const HIGH_SIGNAL_LIVE_MODEL_PRIORITY = [
 ] as const;
 
 export const DEFAULT_HIGH_SIGNAL_LIVE_MODEL_LIMIT = HIGH_SIGNAL_LIVE_MODEL_PRIORITY.length;
+const DEFAULT_HIGH_SIGNAL_LIVE_EXCLUDED_PROVIDERS = new Set(["codex"]);
 
 const HIGH_SIGNAL_LIVE_MODEL_PRIORITY_INDEX = new Map<string, number>(
   HIGH_SIGNAL_LIVE_MODEL_PRIORITY.map((key, index) => [key, index]),
@@ -95,6 +96,26 @@ export function isHighSignalLiveModelRef(ref: ModelRef): boolean {
     return false;
   }
   return isHighSignalClaudeModelId(id);
+}
+
+export function shouldExcludeProviderFromDefaultHighSignalLiveSweep(params: {
+  provider?: string | null;
+  useExplicitModels: boolean;
+  providerFilter?: ReadonlySet<string> | null;
+}): boolean {
+  const provider = normalizeProviderId(params.provider ?? "");
+  if (!provider || params.useExplicitModels) {
+    return false;
+  }
+  if (!DEFAULT_HIGH_SIGNAL_LIVE_EXCLUDED_PROVIDERS.has(provider)) {
+    return false;
+  }
+  for (const filterEntry of params.providerFilter ?? []) {
+    if (normalizeProviderId(filterEntry) === provider) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function toCanonicalHighSignalLiveModelKey(ref: ModelRef): string | null {

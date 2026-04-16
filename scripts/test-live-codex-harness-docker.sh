@@ -76,6 +76,9 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 export COREPACK_HOME="${COREPACK_HOME:-$XDG_CACHE_HOME/node/corepack}"
 export NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-$XDG_CACHE_HOME/npm}"
 export npm_config_cache="$NPM_CONFIG_CACHE"
+# Force the Codex harness to use the staged `~/.codex` auth files. This lane
+# is not meant to exercise raw OpenAI API-key routing.
+unset OPENAI_API_KEY OPENAI_BASE_URL
 mkdir -p "$NPM_CONFIG_PREFIX" "$XDG_CACHE_HOME" "$COREPACK_HOME" "$NPM_CONFIG_CACHE"
 chmod 700 "$XDG_CACHE_HOME" "$COREPACK_HOME" "$NPM_CONFIG_CACHE" || true
 export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
@@ -89,6 +92,10 @@ if ((${#auth_files[@]} > 0)); then
       chmod u+rw "$HOME/$auth_file" || true
     fi
   done
+fi
+if [ ! -s "$HOME/.codex/auth.json" ]; then
+  echo "ERROR: missing ~/.codex/auth.json for Codex harness live test." >&2
+  exit 1
 fi
 if [ ! -x "$NPM_CONFIG_PREFIX/bin/codex" ]; then
   npm install -g @openai/codex
@@ -125,7 +132,6 @@ docker run --rm -t \
   -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
   -e HOME=/home/node \
   -e NODE_OPTIONS=--disable-warning=ExperimentalWarning \
-  -e OPENAI_API_KEY \
   -e OPENCLAW_AGENT_HARNESS_FALLBACK=none \
   -e OPENCLAW_CODEX_APP_SERVER_BIN="${OPENCLAW_CODEX_APP_SERVER_BIN:-codex}" \
   -e OPENCLAW_DOCKER_AUTH_FILES_RESOLVED="$AUTH_FILES_CSV" \

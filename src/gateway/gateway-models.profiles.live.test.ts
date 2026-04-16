@@ -20,6 +20,7 @@ import {
   isHighSignalLiveModelRef,
   resolveHighSignalLiveModelLimit,
   selectHighSignalLiveItems,
+  shouldExcludeProviderFromDefaultHighSignalLiveSweep,
 } from "../agents/live-model-filter.js";
 import { createLiveTargetMatcher } from "../agents/live-target-matcher.js";
 import { isLiveProfileKeyModeEnabled, isLiveTestEnabled } from "../agents/live-test-helpers.js";
@@ -2063,7 +2064,14 @@ describeLive("gateway live (dev agent, profile keys)", () => {
         });
         const wanted = filter
           ? all.filter((m) => targetMatcher.matchesModel(m.provider, m.id))
-          : all.filter((m) => isHighSignalLiveModelRef({ provider: m.provider, id: m.id }));
+          : all.filter(
+              (m) =>
+                !shouldExcludeProviderFromDefaultHighSignalLiveSweep({
+                  provider: m.provider,
+                  useExplicitModels: useExplicit,
+                  providerFilter: PROVIDERS,
+                }) && isHighSignalLiveModelRef({ provider: m.provider, id: m.id }),
+            );
 
         const candidates: Array<Model<Api>> = [];
         const skipped: Array<{ model: string; error: string }> = [];

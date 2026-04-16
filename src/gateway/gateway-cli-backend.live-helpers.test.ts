@@ -122,4 +122,16 @@ describe("gateway cli backend live helpers", () => {
 
     expect(shouldRunCliModelSwitchProbe("claude-cli", "claude-cli/claude-sonnet-4-6")).toBe(false);
   });
+
+  it("retries cancelled cron MCP replies", async () => {
+    const { shouldRetryCliCronMcpProbeReply } =
+      await import("./gateway-cli-backend.live-helpers.js");
+
+    expect(
+      shouldRetryCliCronMcpProbeReply(
+        "The `cron` MCP tool call was cancelled again, so the job was not created.",
+      ),
+    ).toBe(true);
+    expect(shouldRetryCliCronMcpProbeReply("live-mcp-abc123")).toBe(false);
+  });
 });

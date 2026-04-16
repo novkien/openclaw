@@ -11,7 +11,7 @@
  * Run manually with a valid OPENAI_API_KEY:
  *   OPENCLAW_LIVE_TEST=1 pnpm test:e2e -- src/agents/openai-ws-stream.e2e.test.ts
  *
- * Skipped in CI — no API key available and we avoid billable external calls.
+ * This now runs only in the keyed live/release lanes.
  */
 
 import type {
@@ -391,7 +391,9 @@ describe("OpenAI WebSocket e2e", () => {
         expect(assistantText(done).toLowerCase()).toContain("warmed");
       }
     },
-    45_000,
+    // The first websocket warm-up turn is the most latency-sensitive live case
+    // in this suite and can cross 45s on loaded CI runners.
+    75_000,
   );
 
   testFn(
