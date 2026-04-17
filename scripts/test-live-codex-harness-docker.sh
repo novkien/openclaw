@@ -12,6 +12,7 @@ CODEX_HARNESS_AUTH_MODE="${OPENCLAW_LIVE_CODEX_HARNESS_AUTH:-codex-auth}"
 TEMP_DIRS=()
 DOCKER_USER="${OPENCLAW_DOCKER_USER:-node}"
 DOCKER_HOME_MOUNT=()
+DOCKER_EXTRA_ENV_FILES=()
 
 case "$CODEX_HARNESS_AUTH_MODE" in
   codex-auth | api-key)
@@ -91,7 +92,16 @@ fi
 
 DOCKER_AUTH_ENV=()
 if [[ "$CODEX_HARNESS_AUTH_MODE" == "api-key" ]]; then
-  DOCKER_AUTH_ENV+=(-e OPENAI_API_KEY)
+  docker_env_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/openclaw-codex-harness-env.XXXXXX")"
+  TEMP_DIRS+=("$docker_env_dir")
+  docker_env_file="$docker_env_dir/openai.env"
+  {
+    printf 'OPENAI_API_KEY=%s\n' "${OPENAI_API_KEY}"
+    if [[ -n "${OPENAI_BASE_URL:-}" ]]; then
+      printf 'OPENAI_BASE_URL=%s\n' "${OPENAI_BASE_URL}"
+    fi
+  } >"$docker_env_file"
+  DOCKER_EXTRA_ENV_FILES+=(--env-file "$docker_env_file")
 fi
 
 read -r -d '' LIVE_TEST_CMD <<'EOF' || true
@@ -175,6 +185,7 @@ docker run --rm -t \
   -e OPENCLAW_LIVE_TEST=1 \
   -e OPENCLAW_VITEST_FS_MODULE_CACHE=0 \
   "${DOCKER_AUTH_ENV[@]}" \
+  "${DOCKER_EXTRA_ENV_FILES[@]}" \
   "${DOCKER_HOME_MOUNT[@]}" \
   -v "$CACHE_HOME_DIR":/home/node/.cache \
   -v "$ROOT_DIR":/src:ro \

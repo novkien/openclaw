@@ -16,6 +16,7 @@ CLI_AUTH_MODE="${OPENCLAW_LIVE_CLI_BACKEND_AUTH:-auto}"
 TEMP_DIRS=()
 DOCKER_USER="${OPENCLAW_DOCKER_USER:-node}"
 DOCKER_HOME_MOUNT=()
+DOCKER_EXTRA_ENV_FILES=()
 
 if [[ -z "$CLI_PROVIDER" || "$CLI_PROVIDER" == "$CLI_MODEL" ]]; then
   CLI_PROVIDER="$DEFAULT_PROVIDER"
@@ -362,9 +363,16 @@ DOCKER_AUTH_ENV=(
   -e OPENCLAW_LIVE_CLI_BACKEND_AUTH="$CLI_AUTH_MODE"
 )
 if [[ "$CLI_PROVIDER" == "codex-cli" && "$CLI_AUTH_MODE" == "api-key" ]]; then
-  DOCKER_AUTH_ENV+=(
-    -e OPENAI_API_KEY
-  )
+  docker_env_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/openclaw-cli-backend-env.XXXXXX")"
+  TEMP_DIRS+=("$docker_env_dir")
+  docker_env_file="$docker_env_dir/openai.env"
+  {
+    printf 'OPENAI_API_KEY=%s\n' "${OPENAI_API_KEY}"
+    if [[ -n "${OPENAI_BASE_URL:-}" ]]; then
+      printf 'OPENAI_BASE_URL=%s\n' "${OPENAI_BASE_URL}"
+    fi
+  } >"$docker_env_file"
+  DOCKER_EXTRA_ENV_FILES+=(--env-file "$docker_env_file")
 elif [[ "$CLI_PROVIDER" == "claude-cli" && "$CLI_AUTH_MODE" == "subscription" ]]; then
   DOCKER_AUTH_ENV+=(
     -e CLAUDE_CODE_OAUTH_TOKEN="${CLAUDE_CODE_OAUTH_TOKEN:-}"
@@ -410,6 +418,7 @@ docker run --rm -t \
   -e OPENCLAW_LIVE_CLI_BACKEND_IMAGE_ARG="${OPENCLAW_LIVE_CLI_BACKEND_IMAGE_ARG:-}" \
   -e OPENCLAW_LIVE_CLI_BACKEND_IMAGE_MODE="${OPENCLAW_LIVE_CLI_BACKEND_IMAGE_MODE:-}" \
   "${DOCKER_HOME_MOUNT[@]}" \
+  "${DOCKER_EXTRA_ENV_FILES[@]}" \
   -v "$CACHE_HOME_DIR":/home/node/.cache \
   -v "$ROOT_DIR":/src:ro \
   -v "$CONFIG_DIR":/home/node/.openclaw \
