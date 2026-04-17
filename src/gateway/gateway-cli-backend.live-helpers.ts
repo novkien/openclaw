@@ -178,7 +178,11 @@ export function shouldRetryCliCronMcpProbeReply(text: string): boolean {
   const normalized = normalizeLowercaseStringOrEmpty(text);
   const mentionsCancellation =
     normalized.includes("tool call was cancelled") || normalized.includes("tool call was canceled");
-  return mentionsCancellation && normalized.includes("job was not created");
+  const mentionsMissingJob =
+    normalized.includes("job was not created") ||
+    normalized.includes("job still was not created") ||
+    normalized.includes("was not created");
+  return mentionsCancellation && mentionsMissingJob;
 }
 
 export async function connectTestGatewayClient(params: {

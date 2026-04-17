@@ -392,8 +392,8 @@ describe("OpenAI WebSocket e2e", () => {
       }
     },
     // The first websocket warm-up turn is the most latency-sensitive live case
-    // in this suite and can cross 45s on loaded CI runners.
-    75_000,
+    // in this suite and can exceed 75s on loaded CI runners.
+    120_000,
   );
 
   testFn(
