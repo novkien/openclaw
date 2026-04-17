@@ -182,13 +182,13 @@ jobs:
           elif git tag --points-at "$selected_sha" | grep -Eq '^v'; then
             trusted_reason="release-tag"
           else
-            pr_count="$(
+            pr_head_count="$(
               gh api \
                 -H "Accept: application/vnd.github+json" \
                 "repos/${GITHUB_REPOSITORY}/commits/${selected_sha}/pulls" \
-                --jq '[.[] | select(.state == "open" and .head.repo.full_name == "'"${GITHUB_REPOSITORY}"'")] | length'
+                --jq '[.[] | select(.state == "open" and .head.repo.full_name == "'"${GITHUB_REPOSITORY}"'" and .head.sha == "'"${selected_sha}"'")] | length'
             )"
-            if [[ "$pr_count" != "0" ]]; then
+            if [[ "$pr_head_count" != "0" ]]; then
               trusted_reason="open-pr-head"
             fi
           fi
